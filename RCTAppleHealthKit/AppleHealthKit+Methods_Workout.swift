@@ -105,27 +105,85 @@ extension AppleHealthKit {
         let type = HKWorkoutActivityType(rawValue: AppleHealthKit.hkWorkoutActivityTypeFromOptions(input, key: "type", withDefault: HKWorkoutActivityType.americanFootball.rawValue))!
         let startDate = AppleHealthKit.dateFromOptions(input, key: "startDate", withDefault: nil)
         let endDate = AppleHealthKit.dateFromOptions(input, key: "endDate", withDefault: nil)
-        let duration = AppleHealthKit.doubleFromOptions(input, key: "duration", withDefault: 0)
         let totalEnergyBurned = AppleHealthKit.hkQuantityFromOptions(input, valueKey: "energyBurned", unitKey: "energyBurnedUnit")
         let totalDistance = AppleHealthKit.hkQuantityFromOptions(input, valueKey: "distance", unitKey: "distanceUnit")
 
-        let workout = HKWorkout(activityType: type,
-                                start: startDate!,
-                                end: endDate!,
-                                workoutEvents: nil,
-                                totalEnergyBurned: totalEnergyBurned,
-                                totalDistance: totalDistance,
-                                metadata: nil)
-
-        let completion: (Bool, Error?) -> Void = { success, error in
-            if !success {
-                NSLog("An error occured saving the workout %@. The error was: %@.", workout, error?.localizedDescription ?? "")
-                callback([RCTMakeError("An error occured saving the workout", error, nil)])
-                return
-            }
-            callback([NSNull(), workout.uuid.uuidString])
+        guard let healthStore = self.healthStore, let start = startDate, let end = endDate else {
+            callback([RCTMakeError("startDate and endDate are required", nil, nil)])
+            return
         }
 
-        self.healthStore?.save(workout, withCompletion: completion)
+        if #available(iOS 17.0, *) {
+            let config = HKWorkoutConfiguration()
+            config.activityType = type
+
+            let builder = HKWorkoutBuilder(healthStore: healthStore, configuration: config, device: nil)
+            builder.beginCollection(withStart: start) { success, error in
+                guard success else {
+                    callback([RCTMakeError("An error occurred saving the workout", error, nil)])
+                    return
+                }
+
+                var samples = [HKSample]()
+
+                if let energyBurned = totalEnergyBurned,
+                   let energyType = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned) {
+                    let energySample = HKQuantitySample(type: energyType, quantity: energyBurned, start: start, end: end)
+                    samples.append(energySample)
+                }
+
+                if let distance = totalDistance,
+                   let distanceType = HKQuantityType.quantityType(forIdentifier: .distanceWalkingRunning) {
+                    let distanceSample = HKQuantitySample(type: distanceType, quantity: distance, start: start, end: end)
+                    samples.append(distanceSample)
+                }
+
+                let addSamplesAndFinish = {
+                    builder.endCollection(withEnd: end) { success, error in
+                        guard success else {
+                            callback([RCTMakeError("An error occurred saving the workout", error, nil)])
+                            return
+                        }
+
+                        builder.finishWorkout { workout, error in
+                            guard let workout = workout else {
+                                callback([RCTMakeError("An error occurred saving the workout", error, nil)])
+                                return
+                            }
+                            callback([NSNull(), workout.uuid.uuidString])
+                        }
+                    }
+                }
+
+                if !samples.isEmpty {
+                    builder.add(samples) { success, error in
+                        guard success else {
+                            callback([RCTMakeError("An error occurred saving the workout", error, nil)])
+                            return
+                        }
+                        addSamplesAndFinish()
+                    }
+                } else {
+                    addSamplesAndFinish()
+                }
+            }
+        } else {
+            let workout = HKWorkout(activityType: type,
+                                    start: start,
+                                    end: end,
+                                    workoutEvents: nil,
+                                    totalEnergyBurned: totalEnergyBurned,
+                                    totalDistance: totalDistance,
+                                    metadata: nil)
+
+            healthStore.save(workout) { success, error in
+                if !success {
+                    NSLog("An error occured saving the workout %@. The error was: %@.", workout, error?.localizedDescription ?? "")
+                    callback([RCTMakeError("An error occured saving the workout", error, nil)])
+                    return
+                }
+                callback([NSNull(), workout.uuid.uuidString])
+            }
+        }
     }
 }

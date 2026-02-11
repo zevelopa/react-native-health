@@ -197,22 +197,20 @@ extension AppleHealthKit {
     }
 
     @objc static func clinicalTypeFromName(_ type: String) -> HKSampleType? {
-        if #available(iOS 12.0, *) {
-            if type == "AllergyRecord" {
-                return HKObjectType.clinicalType(forIdentifier: .allergyRecord)
-            } else if type == "ConditionRecord" {
-                return HKObjectType.clinicalType(forIdentifier: .conditionRecord)
-            } else if type == "ImmunizationRecord" {
-                return HKObjectType.clinicalType(forIdentifier: .immunizationRecord)
-            } else if type == "LabResultRecord" {
-                return HKObjectType.clinicalType(forIdentifier: .labResultRecord)
-            } else if type == "MedicationRecord" {
-                return HKObjectType.clinicalType(forIdentifier: .medicationRecord)
-            } else if type == "ProcedureRecord" {
-                return HKObjectType.clinicalType(forIdentifier: .procedureRecord)
-            } else if type == "VitalSignRecord" {
-                return HKObjectType.clinicalType(forIdentifier: .vitalSignRecord)
-            }
+        if type == "AllergyRecord" {
+            return HKObjectType.clinicalType(forIdentifier: .allergyRecord)
+        } else if type == "ConditionRecord" {
+            return HKObjectType.clinicalType(forIdentifier: .conditionRecord)
+        } else if type == "ImmunizationRecord" {
+            return HKObjectType.clinicalType(forIdentifier: .immunizationRecord)
+        } else if type == "LabResultRecord" {
+            return HKObjectType.clinicalType(forIdentifier: .labResultRecord)
+        } else if type == "MedicationRecord" {
+            return HKObjectType.clinicalType(forIdentifier: .medicationRecord)
+        } else if type == "ProcedureRecord" {
+            return HKObjectType.clinicalType(forIdentifier: .procedureRecord)
+        } else if type == "VitalSignRecord" {
+            return HKObjectType.clinicalType(forIdentifier: .vitalSignRecord)
         }
 
         if #available(iOS 14.0, *) {
@@ -231,10 +229,7 @@ extension AppleHealthKit {
         guard let anchorData = Data(base64Encoded: anchorString, options: []) else {
             return nil
         }
-        let anchor = NSKeyedUnarchiver.unarchiveObject(with: anchorData) as? HKQueryAnchor
-        if anchor == nil {
-            return nil
-        }
+        let anchor = try? NSKeyedUnarchiver.unarchivedObject(ofClass: HKQueryAnchor.self, from: anchorData)
         return anchor
     }
 
@@ -423,6 +418,26 @@ extension AppleHealthKit {
         return nil
     }
 
+    // MARK: - Workout Helpers (iOS 16+ deprecation-safe)
+
+    static func workoutEnergyBurned(_ workout: HKWorkout) -> Double {
+        if #available(iOS 16.0, *) {
+            guard let energyType = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned) else { return 0 }
+            return workout.statistics(for: energyType)?.sumQuantity()?.doubleValue(for: HKUnit.kilocalorie()) ?? 0
+        } else {
+            return workout.totalEnergyBurned?.doubleValue(for: HKUnit.kilocalorie()) ?? 0
+        }
+    }
+
+    static func workoutDistance(_ workout: HKWorkout) -> Double {
+        if #available(iOS 16.0, *) {
+            guard let distanceType = HKQuantityType.quantityType(forIdentifier: .distanceWalkingRunning) else { return 0 }
+            return workout.statistics(for: distanceType)?.sumQuantity()?.doubleValue(for: HKUnit.mile()) ?? 0
+        } else {
+            return workout.totalDistance?.doubleValue(for: HKUnit.mile()) ?? 0
+        }
+    }
+
     @objc static func stringForHKWorkoutActivityType(_ enumValue: Int) -> String {
         switch enumValue {
         case HKWorkoutActivityType.americanFootball.rawValue:
@@ -457,8 +472,6 @@ extension AppleHealthKit {
             return "Cycling"
         case HKWorkoutActivityType.dance.rawValue:
             return "Dance"
-        case HKWorkoutActivityType.danceInspiredTraining.rawValue:
-            return "DanceInspiredTraining"
         case HKWorkoutActivityType.discSports.rawValue:
             return "DiscSports"
         case HKWorkoutActivityType.elliptical.rawValue:
@@ -491,8 +504,8 @@ extension AppleHealthKit {
             return "MartialArts"
         case HKWorkoutActivityType.mindAndBody.rawValue:
             return "MindAndBody"
-        case HKWorkoutActivityType.mixedMetabolicCardioTraining.rawValue:
-            return "MixedMetabolicCardioTraining"
+        case HKWorkoutActivityType.mixedCardio.rawValue:
+            return "MixedCardio"
         case HKWorkoutActivityType.paddleSports.rawValue:
             return "PaddleSports"
         case HKWorkoutActivityType.play.rawValue:
@@ -583,8 +596,6 @@ extension AppleHealthKit {
             return "WheelchairRunPace"
         case HKWorkoutActivityType.taiChi.rawValue:
             return "TaiChi"
-        case HKWorkoutActivityType.mixedCardio.rawValue:
-            return "MixedCardio"
         case HKWorkoutActivityType.handCycling.rawValue:
             return "HandCycling"
         default:

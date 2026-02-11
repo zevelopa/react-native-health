@@ -177,104 +177,100 @@ extension AppleHealthKit {
     }
 
     func vitals_getHeartbeatSeriesSamples(_ input: NSDictionary, callback: @escaping RCTResponseSenderBlock) {
-        if #available(iOS 13.0, *) {
-            let heartbeatSeriesType = HKSeriesType.seriesType(forIdentifier: HKDataTypeIdentifierHeartbeatSeries)!
+        let heartbeatSeriesType = HKSeriesType.seriesType(forIdentifier: HKDataTypeIdentifierHeartbeatSeries)!
 
-            let limit = AppleHealthKit.uintFromOptions(input, key: "limit", withDefault: HKObjectQueryNoLimit)
-            let ascending = AppleHealthKit.boolFromOptions(input, key: "ascending", withDefault: false)
-            let startDate = AppleHealthKit.dateFromOptions(input, key: "startDate", withDefault: nil)
-            let endDate = AppleHealthKit.dateFromOptions(input, key: "endDate", withDefault: Date())
-            if startDate == nil {
-                callback([RCTMakeError("startDate is required in options", nil, nil)])
+        let limit = AppleHealthKit.uintFromOptions(input, key: "limit", withDefault: HKObjectQueryNoLimit)
+        let ascending = AppleHealthKit.boolFromOptions(input, key: "ascending", withDefault: false)
+        let startDate = AppleHealthKit.dateFromOptions(input, key: "startDate", withDefault: nil)
+        let endDate = AppleHealthKit.dateFromOptions(input, key: "endDate", withDefault: Date())
+        if startDate == nil {
+            callback([RCTMakeError("startDate is required in options", nil, nil)])
+            return
+        }
+        let predicate = AppleHealthKit.predicateForSamplesBetweenDates(startDate!, endDate: endDate!)
+        let timeSortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: ascending)
+
+        // Define the results handler for the SampleQuery.
+        let resultsHandler: (HKSampleQuery, [HKSample]?, Error?) -> Void = { (query, results, error) in
+            if let error = error {
+                callback([RCTJSErrorFromNSError(error as NSError)])
                 return
             }
-            let predicate = AppleHealthKit.predicateForSamplesBetweenDates(startDate!, endDate: endDate!)
-            let timeSortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: ascending)
 
-            // Define the results handler for the SampleQuery.
-            let resultsHandler: (HKSampleQuery, [HKSample]?, Error?) -> Void = { (query, results, error) in
-                if let error = error {
-                    callback([RCTJSErrorFromNSError(error as NSError)])
-                    return
-                }
+            guard let results = results else {
+                callback([RCTJSErrorFromNSError(NSError(domain: "AppleHealthKit", code: 0, userInfo: [NSLocalizedDescriptionKey: "No results"]))])
+                return
+            }
 
-                guard let results = results else {
-                    callback([RCTJSErrorFromNSError(NSError(domain: "AppleHealthKit", code: 0, userInfo: [NSLocalizedDescriptionKey: "No results"]))])
-                    return
-                }
+            // explicitly send back an empty array for no results
+            if results.count == 0 {
+                callback([NSNull(), []])
+                return
+            }
 
-                // explicitly send back an empty array for no results
-                if results.count == 0 {
-                    callback([NSNull(), []])
-                    return
-                }
+            var samplesProcessed: UInt = 0
+            let data = NSMutableArray(capacity: 1)
 
-                var samplesProcessed: UInt = 0
-                let data = NSMutableArray(capacity: 1)
-
-                // create a function that checks the progress of processing the samples
-                // and executes the callback with the data when done
-                let maybeFinish = {
-                    // check to see if we've processed all of the returned samples, and return if so
-                    if samplesProcessed == results.count {
-                        callback([NSNull(), data])
-                    }
-                }
-
-                for sample in results {
-                    guard let heartbeatSample = sample as? HKHeartbeatSeriesSample else { continue }
-                    let startDateString = AppleHealthKit.buildISO8601StringFromDate(heartbeatSample.startDate) ?? ""
-                    let endDateString = AppleHealthKit.buildISO8601StringFromDate(heartbeatSample.endDate) ?? ""
-
-                    let elem: [String: Any] = [
-                        "id": heartbeatSample.uuid.uuidString,
-                        "sourceName": heartbeatSample.sourceRevision.source.name,
-                        "sourceId": heartbeatSample.sourceRevision.source.bundleIdentifier,
-                        "startDate": startDateString,
-                        "endDate": endDateString,
-                        "heartbeatSeries": []
-                    ]
-                    let mutableElem = NSMutableDictionary(dictionary: elem)
-                    data.add(mutableElem)
-
-                    // create an array to hold the series data which will be fetched asynchronously from healthkit
-                    let seriesData = NSMutableArray(capacity: Int(heartbeatSample.count))
-
-                    // now define the data handler for the HeartbeatSeriesQuery
-                    let dataHandler: (HKHeartbeatSeriesQuery, TimeInterval, Bool, Bool, Error?) -> Void = { (hrSeriesQuery, timeSinceSeriesStart, precededByGap, done, error) in
-                        if error == nil {
-                            // If no error exists for this data point, add the value to the heartbeatSeries array.
-                            let el: [String: Any] = [
-                                "timeSinceSeriesStart": timeSinceSeriesStart,
-                                "precededByGap": precededByGap
-                            ]
-                            seriesData.add(el)
-                        }
-
-                        if done {
-                            mutableElem.setObject(seriesData, forKey: "heartbeatSeries" as NSString)
-                            samplesProcessed += 1
-                            maybeFinish()
-                        }
-                    }
-                    // Query the heartbeat series for this sample.
-                    let hrSeriesQuery = HKHeartbeatSeriesQuery(heartbeatSeries: heartbeatSample, dataHandler: dataHandler)
-                    self.healthStore?.execute(hrSeriesQuery)
+            // create a function that checks the progress of processing the samples
+            // and executes the callback with the data when done
+            let maybeFinish = {
+                // check to see if we've processed all of the returned samples, and return if so
+                if samplesProcessed == results.count {
+                    callback([NSNull(), data])
                 }
             }
 
-            // Define and execute the HKSampleQuery
-            let query = HKSampleQuery(
-                sampleType: heartbeatSeriesType,
-                predicate: predicate,
-                limit: limit,
-                sortDescriptors: [timeSortDescriptor],
-                resultsHandler: resultsHandler
-            )
-            self.healthStore?.execute(query)
-        } else {
-            callback([RCTMakeError("HeartbeatSeries is not available for this iOS version", nil, nil)])
+            for sample in results {
+                guard let heartbeatSample = sample as? HKHeartbeatSeriesSample else { continue }
+                let startDateString = AppleHealthKit.buildISO8601StringFromDate(heartbeatSample.startDate) ?? ""
+                let endDateString = AppleHealthKit.buildISO8601StringFromDate(heartbeatSample.endDate) ?? ""
+
+                let elem: [String: Any] = [
+                    "id": heartbeatSample.uuid.uuidString,
+                    "sourceName": heartbeatSample.sourceRevision.source.name,
+                    "sourceId": heartbeatSample.sourceRevision.source.bundleIdentifier,
+                    "startDate": startDateString,
+                    "endDate": endDateString,
+                    "heartbeatSeries": []
+                ]
+                let mutableElem = NSMutableDictionary(dictionary: elem)
+                data.add(mutableElem)
+
+                // create an array to hold the series data which will be fetched asynchronously from healthkit
+                let seriesData = NSMutableArray(capacity: Int(heartbeatSample.count))
+
+                // now define the data handler for the HeartbeatSeriesQuery
+                let dataHandler: (HKHeartbeatSeriesQuery, TimeInterval, Bool, Bool, Error?) -> Void = { (hrSeriesQuery, timeSinceSeriesStart, precededByGap, done, error) in
+                    if error == nil {
+                        // If no error exists for this data point, add the value to the heartbeatSeries array.
+                        let el: [String: Any] = [
+                            "timeSinceSeriesStart": timeSinceSeriesStart,
+                            "precededByGap": precededByGap
+                        ]
+                        seriesData.add(el)
+                    }
+
+                    if done {
+                        mutableElem.setObject(seriesData, forKey: "heartbeatSeries" as NSString)
+                        samplesProcessed += 1
+                        maybeFinish()
+                    }
+                }
+                // Query the heartbeat series for this sample.
+                let hrSeriesQuery = HKHeartbeatSeriesQuery(heartbeatSeries: heartbeatSample, dataHandler: dataHandler)
+                self.healthStore?.execute(hrSeriesQuery)
+            }
         }
+
+        // Define and execute the HKSampleQuery
+        let query = HKSampleQuery(
+            sampleType: heartbeatSeriesType,
+            predicate: predicate,
+            limit: limit,
+            sortDescriptors: [timeSortDescriptor],
+            resultsHandler: resultsHandler
+        )
+        self.healthStore?.execute(query)
     }
 
     func vitals_getRestingHeartRateSamples(_ input: NSDictionary, callback: @escaping RCTResponseSenderBlock) {

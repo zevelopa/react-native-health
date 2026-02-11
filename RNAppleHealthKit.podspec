@@ -32,6 +32,10 @@ A React Native package to interact with Apple HealthKit
   s.source_files = 'RCTAppleHealthKit/**/*.{h,m,swift}'
 
   s.frameworks = ['HealthKit']
-  s.dependency 'React'
-  s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES', 'SWIFT_OBJC_BRIDGING_HEADER' => '$(PODS_TARGET_SRCROOT)/RCTAppleHealthKit/AppleHealthKit-Bridging-Header.h' }
+  s.dependency 'React-Core'
+  s.pod_target_xcconfig = {
+    'DEFINES_MODULE' => 'YES',
+    'SWIFT_OBJC_BRIDGING_HEADER' => '$(PODS_TARGET_SRCROOT)/RCTAppleHealthKit/AppleHealthKit-Bridging-Header.h',
+    'SWIFT_ENABLE_EXPLICIT_MODULES' => 'NO'
+  }
 end
