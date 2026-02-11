@@ -26,11 +26,12 @@ A React Native package to interact with Apple HealthKit
   s.author           = { 'Agency Enterprise' => '' }
   s.source           = { :git => 'https://github.com/agencyenterprise/react-native-healthkit.git', :tag => s.version.to_s }
 
-  s.ios.deployment_target = '9.0'
-  s.swift_version = '4.2'
+  s.ios.deployment_target = '13.0'
+  s.swift_version = '5.0'
 
-  s.source_files = 'RCTAppleHealthKit/**/*'
+  s.source_files = 'RCTAppleHealthKit/**/*.{h,m,swift}'
 
   s.frameworks = ['HealthKit']
   s.dependency 'React'
+  s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES', 'SWIFT_OBJC_BRIDGING_HEADER' => '$(PODS_TARGET_SRCROOT)/RCTAppleHealthKit/AppleHealthKit-Bridging-Header.h' }
 end
