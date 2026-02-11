@@ -117,17 +117,12 @@ extension AppleHealthKit {
 
                     if done {
                         // all batches successfully completed
-                        let anchorData = NSKeyedArchiver.archivedData(withRootObject: newAnchor as Any)
+                        let anchorData = (try? NSKeyedArchiver.archivedData(withRootObject: newAnchor as Any, requiringSecureCoding: true)) ?? Data()
                         let anchorString = anchorData.base64EncodedString(options: [])
                         let start = AppleHealthKit.buildISO8601StringFromDate(routeSample.startDate) ?? ""
                         let end = AppleHealthKit.buildISO8601StringFromDate(routeSample.endDate) ?? ""
 
-                        var device = ""
-                        if #available(iOS 11.0, *) {
-                            device = routeSample.sourceRevision.productType ?? ""
-                        } else {
-                            device = routeSample.device?.name ?? "iPhone"
-                        }
+                        let device = routeSample.sourceRevision.productType ?? ""
 
                         let metaData: Any = routeSample.metadata ?? [String: Any]()
 
@@ -274,8 +269,8 @@ extension AppleHealthKit {
                     for sample in results {
                         guard let sample = sample as? HKWorkout else { continue }
                         do {
-                            let energy = sample.totalEnergyBurned?.doubleValue(for: HKUnit.kilocalorie()) ?? 0
-                            let distance = sample.totalDistance?.doubleValue(for: HKUnit.mile()) ?? 0
+                            let energy = AppleHealthKit.workoutEnergyBurned(sample)
+                            let distance = AppleHealthKit.workoutDistance(sample)
                             let activityName = AppleHealthKit.stringForHKWorkoutActivityType(Int(sample.workoutActivityType.rawValue))
 
                             let startDateString = AppleHealthKit.buildISO8601StringFromDate(sample.startDate) ?? ""
@@ -287,12 +282,7 @@ extension AppleHealthKit {
                                 isTracked = false
                             }
 
-                            var device = ""
-                            if #available(iOS 11.0, *) {
-                                device = sample.sourceRevision.productType ?? ""
-                            } else {
-                                device = sample.device?.name ?? "iPhone"
-                            }
+                            let device = sample.sourceRevision.productType ?? ""
 
                             let elem: [String: Any] = [
                                 "activityId": NSNumber(value: sample.workoutActivityType.rawValue),
@@ -335,12 +325,7 @@ extension AppleHealthKit {
                                 isTracked = false
                             }
 
-                            var device = ""
-                            if #available(iOS 11.0, *) {
-                                device = sample.sourceRevision.productType ?? ""
-                            } else {
-                                device = sample.device?.name ?? "iPhone"
-                            }
+                            let device = sample.sourceRevision.productType ?? ""
 
                             let elem: [String: Any] = [
                                 valueType: value,
@@ -471,8 +456,8 @@ extension AppleHealthKit {
                 for sample in sampleObjects {
                     guard let sample = sample as? HKWorkout else { continue }
                     do {
-                        let energy = sample.totalEnergyBurned?.doubleValue(for: HKUnit.kilocalorie()) ?? 0
-                        let distance = sample.totalDistance?.doubleValue(for: HKUnit.mile()) ?? 0
+                        let energy = AppleHealthKit.workoutEnergyBurned(sample)
+                        let distance = AppleHealthKit.workoutDistance(sample)
                         let activityName = AppleHealthKit.stringForHKWorkoutActivityType(Int(sample.workoutActivityType.rawValue))
                         let workoutEvents = AppleHealthKit.formatWorkoutEvents(sample.workoutEvents ?? [])
                         let duration = sample.duration
@@ -486,12 +471,7 @@ extension AppleHealthKit {
                             isTracked = false
                         }
 
-                        var device = ""
-                        if #available(iOS 11.0, *) {
-                            device = sample.sourceRevision.productType ?? ""
-                        } else {
-                            device = sample.device?.name ?? "iPhone"
-                        }
+                        let device = sample.sourceRevision.productType ?? ""
 
                         let elem: [String: Any] = [
                             "activityId": NSNumber(value: sample.workoutActivityType.rawValue),
@@ -516,7 +496,7 @@ extension AppleHealthKit {
                     }
                 }
 
-                let anchorData = NSKeyedArchiver.archivedData(withRootObject: newAnchor as Any)
+                let anchorData = (try? NSKeyedArchiver.archivedData(withRootObject: newAnchor as Any, requiringSecureCoding: true)) ?? Data()
                 let anchorString = anchorData.base64EncodedString(options: [])
                 completion([
                     "anchor": anchorString,
@@ -964,8 +944,8 @@ extension AppleHealthKit {
             DispatchQueue.global().async {
                 for sample in results {
                     guard let sample = sample as? HKWorkout else { continue }
-                    let energy = sample.totalEnergyBurned?.doubleValue(for: HKUnit.kilocalorie()) ?? 0
-                    let distance = sample.totalDistance?.doubleValue(for: HKUnit.mile()) ?? 0
+                    let energy = AppleHealthKit.workoutEnergyBurned(sample)
+                    let distance = AppleHealthKit.workoutDistance(sample)
                     let activityNumber = NSNumber(value: sample.workoutActivityType.rawValue)
 
                     let activityName = numberToWorkoutNameDictionary.object(forKey: activityNumber) as? String

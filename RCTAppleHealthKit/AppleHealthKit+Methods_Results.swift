@@ -249,9 +249,7 @@ extension AppleHealthKit {
     }
 
     func results_registerObservers(_ bridge: RCTBridge, hasListeners: Bool) {
-        if #available(iOS 11.0, *) {
-            guard let insulinType = HKObjectType.quantityType(forIdentifier: .insulinDelivery) else { return }
-            self.setObserverForType(insulinType, type: "InsulinDelivery", bridge: bridge, hasListeners: hasListeners)
-        }
+        guard let insulinType = HKObjectType.quantityType(forIdentifier: .insulinDelivery) else { return }
+        self.setObserverForType(insulinType, type: "InsulinDelivery", bridge: bridge, hasListeners: hasListeners)
     }
 }

@@ -14,9 +14,6 @@ extension AppleHealthKit {
     // MARK: - HealthKit Permissions
 
     func getReadPermFromText(_ key: String) -> HKObjectType? {
-        let deviceInfo = UIDevice.current
-        let systemVersion = (deviceInfo.systemVersion as NSString).floatValue
-
         // Characteristic Identifiers
         if key == "Height" {
             return HKObjectType.quantityType(forIdentifier: .height)
@@ -31,11 +28,7 @@ extension AppleHealthKit {
         } else if key == "PeakFlow" {
             return HKObjectType.quantityType(forIdentifier: .peakExpiratoryFlowRate)
         } else if key == "WaistCircumference" {
-            if #available(iOS 11.0, *) {
-                return HKObjectType.quantityType(forIdentifier: .waistCircumference)
-            } else {
-                return nil
-            }
+            return HKObjectType.quantityType(forIdentifier: .waistCircumference)
         }
 
         // Body Measurements
@@ -50,12 +43,10 @@ extension AppleHealthKit {
         }
 
         // Hearing Identifiers
-        if #available(iOS 13.0, *) {
-            if key == "EnvironmentalAudioExposure" {
-                return HKObjectType.quantityType(forIdentifier: .environmentalAudioExposure)
-            } else if key == "HeadphoneAudioExposure" {
-                return HKObjectType.quantityType(forIdentifier: .headphoneAudioExposure)
-            }
+        if key == "EnvironmentalAudioExposure" {
+            return HKObjectType.quantityType(forIdentifier: .environmentalAudioExposure)
+        } else if key == "HeadphoneAudioExposure" {
+            return HKObjectType.quantityType(forIdentifier: .headphoneAudioExposure)
         }
 
         // Fitness Identifiers
@@ -85,7 +76,7 @@ extension AppleHealthKit {
             return HKObjectType.quantityType(forIdentifier: .nikeFuel)
         } else if key == "AppleStandTime" {
             return HKObjectType.quantityType(forIdentifier: .appleStandTime)
-        } else if key == "AppleExerciseTime" && systemVersion >= 9.3 {
+        } else if key == "AppleExerciseTime" {
             return HKObjectType.quantityType(forIdentifier: .appleExerciseTime)
         } else if key == "RunningPower" {
             if #available(iOS 16.0, *) {
@@ -205,9 +196,9 @@ extension AppleHealthKit {
             return HKObjectType.quantityType(forIdentifier: .restingHeartRate)
         } else if key == "HeartRateVariability" {
             return HKObjectType.quantityType(forIdentifier: .heartRateVariabilitySDNN)
-        } else if key == "HeartbeatSeries" && systemVersion >= 13.0 {
+        } else if key == "HeartbeatSeries" {
             return HKSeriesType.heartbeat()
-        } else if key == "Vo2Max" && systemVersion >= 11.0 {
+        } else if key == "Vo2Max" {
             return HKObjectType.quantityType(forIdentifier: .vo2Max)
         } else if key == "BodyTemperature" {
             return HKObjectType.quantityType(forIdentifier: .bodyTemperature)
@@ -219,8 +210,11 @@ extension AppleHealthKit {
             return HKObjectType.quantityType(forIdentifier: .respiratoryRate)
         } else if key == "OxygenSaturation" {
             return HKObjectType.quantityType(forIdentifier: .oxygenSaturation)
-        } else if key == "Electrocardiogram" && systemVersion >= 14.0 {
-            return HKObjectType.electrocardiogramType()
+        } else if key == "Electrocardiogram" {
+            if #available(iOS 14.0, *) {
+                return HKObjectType.electrocardiogramType()
+            }
+            return nil
         }
 
         // Sleep
@@ -229,10 +223,8 @@ extension AppleHealthKit {
         }
 
         // Workouts
-        if key == "MindfulSession" && systemVersion >= 10.0 {
+        if key == "MindfulSession" {
             return HKObjectType.categoryType(forIdentifier: .mindfulSession)
-        } else if key == "MindfulSession" {
-            return HKObjectType.workoutType()
         } else if key == "Workout" {
             return HKObjectType.workoutType()
         } else if key == "WorkoutRoute" {
@@ -479,11 +471,7 @@ extension AppleHealthKit {
 
         // Workout Route
         if key == "WorkoutRoute" {
-            if #available(iOS 11.0, *) {
-                return HKSeriesType.workoutRoute()
-            } else {
-                return nil
-            }
+            return HKSeriesType.workoutRoute()
         }
 
         // Lab and Tests
@@ -558,7 +546,7 @@ extension AppleHealthKit {
             "Curling": .curling,
             "Cycling": .cycling,
             "Dance": .dance,
-            "DanceInspiredTraining": .danceInspiredTraining,
+            "DanceInspiredTraining": .cardioDance,
             "Elliptical": .elliptical,
             "EquestrianSports": .equestrianSports,
             "Fencing": .fencing,
@@ -573,7 +561,7 @@ extension AppleHealthKit {
             "Lacrosse": .lacrosse,
             "MartialArts": .martialArts,
             "MindAndBody": .mindAndBody,
-            "MixedMetabolicCardioTraining": .mixedMetabolicCardioTraining,
+            "MixedMetabolicCardioTraining": .mixedCardio,
             "PaddleSports": .paddleSports,
             "Play": .play,
             "PreparationAndRecovery": .preparationAndRecovery,
